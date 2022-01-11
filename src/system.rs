@@ -10,14 +10,14 @@ use bevy::{
 };
 use rand::Rng;
 
-pub fn building_translation(mut query: Query<&mut Transform, With<component::Building>>) {
-    for mut transform in query.iter_mut() {
+pub fn building_translation(mut query_building: Query<&mut Transform, With<component::Building>>) {
+    for mut transform in query_building.iter_mut() {
         transform.translation.x -= SCROLL_SPEED * TIME_STEP as f32;
     }
 }
 
-pub fn reset_building_oob(mut query: Query<&mut Transform, With<component::Building>>) {
-    for mut transform in query
+pub fn reset_building_oob(mut query_building: Query<&mut Transform, With<component::Building>>) {
+    for mut transform in query_building
         .iter_mut()
         .filter(|transform| transform.translation.x < LOWER_LIMIT)
     {
@@ -29,14 +29,14 @@ pub fn reset_building_oob(mut query: Query<&mut Transform, With<component::Build
     }
 }
 
-pub fn gravity(mut query: Query<&mut component::Velocity>) {
-    let mut velocity = query.single_mut();
+pub fn gravity(mut query_square: Query<&mut component::Velocity>) {
+    let mut velocity = query_square.single_mut();
 
     velocity.0 += GRAVITY * TIME_STEP as f32
 }
 
-pub fn apply_velocity(mut query: Query<(&mut Transform, &component::Velocity)>) {
-    let (mut transform, velocity) = query.single_mut();
+pub fn apply_velocity(mut query_square: Query<(&mut Transform, &component::Velocity)>) {
+    let (mut transform, velocity) = query_square.single_mut();
     transform.translation.y += velocity.0 * TIME_STEP as f32
 }
 
@@ -126,9 +126,9 @@ pub fn loose_condition(
 
 pub fn jump_or_fastfall_on_mouse_click(
     mut click_event_reader: EventReader<MouseButtonInput>,
-    mut query_velocity: Query<(&mut component::Velocity, &mut component::IsOnFloor)>,
+    mut query_square: Query<(&mut component::Velocity, &mut component::IsOnFloor)>,
 ) {
-    let (mut velocity, mut is_on_floor) = query_velocity.single_mut();
+    let (mut velocity, mut is_on_floor) = query_square.single_mut();
 
     for event in click_event_reader.iter() {
         if let MouseButtonInput {
