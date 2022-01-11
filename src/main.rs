@@ -1,5 +1,4 @@
 mod component;
-mod event;
 mod system;
 
 use bevy::{core::FixedTimestep, prelude::*};
@@ -23,7 +22,6 @@ const LANDING_TOLERANCE: f32 = 10.;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_event::<event::BuildingCollision>()
         .insert_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
         .add_startup_system(setup)
         .add_system_set(
@@ -33,9 +31,11 @@ fn main() {
                 .with_system(system::reset_building_oob)
                 .with_system(system::gravity)
                 .with_system(system::apply_velocity)
-                .with_system(system::collision_detection)
-                .with_system(system::square_landing)
-                .with_system(system::loose_condition)
+                .with_system(
+                    system::collision_detection
+                        .chain(system::square_landing)
+                        .chain(system::loose_condition),
+                )
                 .with_system(system::jump_or_fastfall_on_mouse_click),
         )
         .add_system(bevy::input::system::exit_on_esc_system)
@@ -54,7 +54,7 @@ fn setup(mut commands: Commands) {
                 transform: Transform {
                     translation: Vec3::new(start, HORIZON + HEIGHT_OFFSET_RANGE, 0.),
                     // +1. to prevent collision on the building side
-                    scale: Vec3::new(GAP, BUILDING_BASE_HEIGHT, 0.),
+                    scale: Vec3::new(GAP + 1., BUILDING_BASE_HEIGHT, 0.),
                     ..Default::default()
                 },
                 sprite: Sprite {

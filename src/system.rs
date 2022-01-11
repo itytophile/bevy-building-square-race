@@ -1,5 +1,5 @@
 use crate::{
-    component, event, BUILDING_WIDTH_RANGE, FASTFALL_FORCE, GRAVITY, HEIGHT_OFFSET_RANGE, HORIZON,
+    component, BUILDING_WIDTH_RANGE, FASTFALL_FORCE, GRAVITY, HEIGHT_OFFSET_RANGE, HORIZON,
     JUMP_FORCE, LANDING_TOLERANCE, LOWER_LIMIT, SCROLL_SPEED, TIME_STEP, UPPER_LIMIT,
 };
 use bevy::{
@@ -29,12 +29,10 @@ pub fn reset_building_oob(mut query: Query<&mut Transform, With<component::Build
     }
 }
 
-pub fn gravity(mut query: Query<(&mut component::Velocity, &component::IsOnFloor)>) {
-    let (mut velocity, is_on_floor) = query.single_mut();
+pub fn gravity(mut query: Query<&mut component::Velocity>) {
+    let mut velocity = query.single_mut();
 
-    if !is_on_floor.0 {
-        velocity.0 += GRAVITY * TIME_STEP as f32
-    }
+    velocity.0 += GRAVITY * TIME_STEP as f32
 }
 
 pub fn apply_velocity(mut query: Query<(&mut Transform, &component::Velocity)>) {
@@ -43,10 +41,9 @@ pub fn apply_velocity(mut query: Query<(&mut Transform, &component::Velocity)>) 
 }
 
 pub fn collision_detection(
-    mut collision_event_writer: EventWriter<event::BuildingCollision>,
     query_square: Query<&Transform, With<component::Velocity>>,
     query_building: Query<&Transform, With<component::Building>>,
-) {
+) -> Option<(Collision, Transform)> {
     let &Transform {
         translation: translation_square,
         scale: scale_square,
@@ -65,8 +62,7 @@ pub fn collision_detection(
             translation,
             scale.truncate(),
         ) {
-            collision_event_writer.send(event::BuildingCollision(collision, transform));
-            break;
+            return Some((collision, transform));
         } else {
             // we copy the translation to not affect the next iterations
             let mut translation_square = translation_square;
@@ -77,30 +73,32 @@ pub fn collision_detection(
                 translation,
                 scale.truncate(),
             ) {
-                collision_event_writer.send(event::BuildingCollision(Collision::Top, transform));
-                break;
+                return Some((Collision::Top, transform));
             }
         }
     }
+
+    None
 }
 
 pub fn square_landing(
-    mut collision_event_reader: EventReader<event::BuildingCollision>,
+    In(collision_info): In<Option<(Collision, Transform)>>,
     mut query_square: Query<(
         &mut Transform,
         &mut component::Velocity,
         &mut component::IsOnFloor,
     )>,
-) {
+) -> Option<(Collision, Transform)> {
     let (mut transform_square, mut velocity_square, mut is_on_floor) = query_square.single_mut();
 
-    if !is_on_floor.0 && velocity_square.0 <= 0. {
-        for event::BuildingCollision(
-            collision,
+    // if falling
+    if velocity_square.0 <= 0. {
+        if let Some((
+            ref collision,
             Transform {
                 translation, scale, ..
             },
-        ) in collision_event_reader.iter()
+        )) = collision_info
         {
             if let Collision::Top = collision {
                 is_on_floor.0 = true;
@@ -108,18 +106,21 @@ pub fn square_landing(
                 transform_square.translation.y =
                     transform_square.scale.y / 2. + scale.y / 2. + translation.y
             }
+        } else {
+            // if no collision and falling then not on floor
+            is_on_floor.0 = false
         }
     }
+
+    collision_info
 }
 
 pub fn loose_condition(
-    mut collision_event_reader: EventReader<event::BuildingCollision>,
+    In(collision_info): In<Option<(Collision, Transform)>>,
     mut app_exit_event_writer: EventWriter<AppExit>,
 ) {
-    for event::BuildingCollision(collision, ..) in collision_event_reader.iter() {
-        if let Collision::Left = collision {
-            app_exit_event_writer.send(AppExit)
-        }
+    if let Some((Collision::Left, ..)) = collision_info {
+        app_exit_event_writer.send(AppExit)
     }
 }
 
@@ -144,23 +145,3 @@ pub fn jump_or_fastfall_on_mouse_click(
         }
     }
 }
-
-/*
-Don't work with Res<Input<MouseButton>>
-
-pub fn jump_or_fastfall_on_mouse_click(
-    mouse_button: Res<Input<MouseButton>>,
-    mut query_velocity: Query<(&mut component::Velocity, &mut component::IsOnFloor)>,
-) {
-    let (mut velocity, mut is_on_floor) = query_velocity.single_mut();
-
-    if mouse_button.just_pressed(MouseButton::Left) {
-        if is_on_floor.0 {
-            velocity.0 = JUMP_FORCE;
-            is_on_floor.0 = false;
-        } else if velocity.0 > FASTFALL_FORCE {
-            velocity.0 = FASTFALL_FORCE
-        }
-    }
-}
-*/
