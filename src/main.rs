@@ -1,8 +1,8 @@
 mod component;
+mod event;
 mod system;
 
 use bevy::{core::FixedTimestep, prelude::*};
-use rand::Rng;
 
 const GAP: f32 = 300.;
 const FACTOR: f32 = 5.;
@@ -14,12 +14,16 @@ const BUILDING_BASE_HEIGHT: f32 = 1000.;
 const HORIZON: f32 = -600.;
 const SCROLL_SPEED: f32 = 400.;
 const SQUARE_SIZE: f32 = 30.;
-const GRAVITY: f32 = -1000.;
+const GRAVITY: f32 = -1500.;
 const TIME_STEP: f64 = 1. / 240.;
+const JUMP_FORCE: f32 = 600.;
+const FASTFALL_FORCE: f32 = -400.;
+const LANDING_TOLERANCE: f32 = 10.;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_event::<event::BuildingCollision>()
         .insert_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
         .add_startup_system(setup)
         .add_system_set(
@@ -28,8 +32,13 @@ fn main() {
                 .with_system(system::building_translation)
                 .with_system(system::reset_building_oob)
                 .with_system(system::gravity)
-                .with_system(system::apply_velocity),
+                .with_system(system::apply_velocity)
+                .with_system(system::collision_detection)
+                .with_system(system::square_landing)
+                .with_system(system::loose_condition)
+                .with_system(system::jump_or_fastfall_on_mouse_click),
         )
+        .add_system(bevy::input::system::exit_on_esc_system)
         .run();
 }
 
@@ -43,8 +52,9 @@ fn setup(mut commands: Commands) {
         commands
             .spawn_bundle(SpriteBundle {
                 transform: Transform {
-                    translation: Vec3::new(start, get_building_y(), 0.),
-                    scale: Vec3::new(get_building_width(), BUILDING_BASE_HEIGHT, 0.),
+                    translation: Vec3::new(start, HORIZON + HEIGHT_OFFSET_RANGE, 0.),
+                    // +1. to prevent collision on the building side
+                    scale: Vec3::new(GAP, BUILDING_BASE_HEIGHT, 0.),
                     ..Default::default()
                 },
                 sprite: Sprite {
@@ -75,14 +85,6 @@ fn setup(mut commands: Commands) {
             },
             ..Default::default()
         })
-        .insert(component::Velocity(0.));
-}
-
-fn get_building_width() -> f32 {
-    BUILDING_WIDTH_RANGE.0
-        + rand::thread_rng().gen::<f32>() * (BUILDING_WIDTH_RANGE.1 - BUILDING_WIDTH_RANGE.0)
-}
-
-fn get_building_y() -> f32 {
-    HORIZON + (1. - 2. * rand::thread_rng().gen::<f32>()) * HEIGHT_OFFSET_RANGE
+        .insert(component::Velocity(0.))
+        .insert(component::IsOnFloor(false));
 }
