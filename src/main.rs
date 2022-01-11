@@ -1,15 +1,8 @@
-use bevy::prelude::*;
-use rand::Rng;
+mod component;
+mod system;
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .insert_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
-        .add_startup_system(setup)
-        .add_system(building_translation_system)
-        .add_system(reset_building_oob_system)
-        .run();
-}
+use bevy::{core::FixedTimestep, prelude::*};
+use rand::Rng;
 
 const GAP: f32 = 300.;
 const FACTOR: f32 = 5.;
@@ -21,34 +14,24 @@ const BUILDING_BASE_HEIGHT: f32 = 1000.;
 const HORIZON: f32 = -600.;
 const SCROLL_SPEED: f32 = 400.;
 const SQUARE_SIZE: f32 = 30.;
+const GRAVITY: f32 = -1000.;
+const TIME_STEP: f64 = 1. / 240.;
 
-fn building_translation_system(
-    time: Res<Time>,
-    mut building_query: Query<&mut Transform, With<Building>>,
-) {
-    for mut transform in building_query.iter_mut() {
-        transform.translation.x -= SCROLL_SPEED * time.delta_seconds();
-    }
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .insert_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
+        .add_startup_system(setup)
+        .add_system_set(
+            SystemSet::new()
+                .with_run_criteria(FixedTimestep::step(TIME_STEP))
+                .with_system(system::building_translation)
+                .with_system(system::reset_building_oob)
+                .with_system(system::gravity)
+                .with_system(system::apply_velocity),
+        )
+        .run();
 }
-
-fn reset_building_oob_system(mut building_query: Query<&mut Transform, With<Building>>) {
-    for mut transform in building_query
-        .iter_mut()
-        .filter(|transform| transform.translation.x < LOWER_LIMIT)
-    {
-        transform.translation.x = UPPER_LIMIT;
-        transform.translation.y = get_building_y();
-        transform.scale.x = get_building_width();
-    }
-}
-
-#[derive(Component)]
-struct Square {
-    velocity: f32,
-}
-
-#[derive(Component)]
-struct Building;
 
 fn setup(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -70,7 +53,7 @@ fn setup(mut commands: Commands) {
                 },
                 ..Default::default()
             })
-            .insert(Building);
+            .insert(component::Building);
 
         start -= GAP;
     }
@@ -83,7 +66,7 @@ fn setup(mut commands: Commands) {
                     HORIZON + HEIGHT_OFFSET_RANGE + BUILDING_BASE_HEIGHT / 2. + SQUARE_SIZE / 2.,
                     0.,
                 ),
-                scale: Vec3::new(SQUARE_SIZE, SQUARE_SIZE, 0.0),
+                scale: Vec3::new(SQUARE_SIZE, SQUARE_SIZE, 0.),
                 ..Default::default()
             },
             sprite: Sprite {
@@ -92,7 +75,7 @@ fn setup(mut commands: Commands) {
             },
             ..Default::default()
         })
-        .insert(Square { velocity: 0. });
+        .insert(component::Velocity(0.));
 }
 
 fn get_building_width() -> f32 {
