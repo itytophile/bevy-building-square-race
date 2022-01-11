@@ -4,7 +4,6 @@ use crate::{
 };
 use bevy::{
     app::AppExit,
-    input::{mouse::MouseButtonInput, ElementState},
     prelude::*,
     sprite::collide_aabb::{collide, Collision},
 };
@@ -125,23 +124,17 @@ pub fn loose_condition(
 }
 
 pub fn jump_or_fastfall_on_mouse_click(
-    mut click_event_reader: EventReader<MouseButtonInput>,
+    mouse_button: Res<Input<MouseButton>>,
     mut query_square: Query<(&mut component::Velocity, &mut component::IsOnFloor)>,
 ) {
     let (mut velocity, mut is_on_floor) = query_square.single_mut();
 
-    for event in click_event_reader.iter() {
-        if let MouseButtonInput {
-            state: ElementState::Pressed,
-            ..
-        } = event
-        {
-            if is_on_floor.0 {
-                velocity.0 = JUMP_FORCE;
-                is_on_floor.0 = false;
-            } else if velocity.0 > FASTFALL_FORCE {
-                velocity.0 = FASTFALL_FORCE
-            }
+    if mouse_button.just_pressed(MouseButton::Left) {
+        if is_on_floor.0 {
+            velocity.0 = JUMP_FORCE;
+            is_on_floor.0 = false;
+        } else if velocity.0 > FASTFALL_FORCE {
+            velocity.0 = FASTFALL_FORCE
         }
     }
 }

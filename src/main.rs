@@ -35,9 +35,9 @@ fn main() {
                     system::collision_detection
                         .chain(system::square_landing)
                         .chain(system::loose_condition),
-                )
-                .with_system(system::jump_or_fastfall_on_mouse_click),
+                ),
         )
+        .add_system(system::jump_or_fastfall_on_mouse_click)
         .add_system(bevy::input::system::exit_on_esc_system)
         .run();
 }
