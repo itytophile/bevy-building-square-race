@@ -8,3 +8,6 @@ pub struct Building;
 
 #[derive(Component)]
 pub struct IsOnFloor(pub bool);
+
+#[derive(Component)]
+pub struct Menu;

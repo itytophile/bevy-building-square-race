@@ -1,17 +1,74 @@
 use crate::{
-    component, BUILDING_WIDTH_RANGE, FASTFALL_FORCE, GRAVITY, HEIGHT_OFFSET_RANGE, HORIZON,
-    JUMP_FORCE, LANDING_TOLERANCE, LOWER_LIMIT, SCROLL_SPEED, TIME_STEP, UPPER_LIMIT,
+    component, AppState, BUILDING_BASE_HEIGHT, BUILDING_WIDTH_RANGE, FACTOR, FASTFALL_FORCE, GAP,
+    GRAVITY, HEIGHT_OFFSET_RANGE, HORIZON, JUMP_FORCE, LANDING_TOLERANCE, LOWER_LIMIT,
+    SCROLL_SPEED, SQUARE_SIZE, UPPER_LIMIT,
 };
 use bevy::{
-    app::AppExit,
     prelude::*,
     sprite::collide_aabb::{collide, Collision},
 };
 use rand::Rng;
 
-pub fn building_translation(mut query_building: Query<&mut Transform, With<component::Building>>) {
+pub fn setup(mut commands: Commands) {
+    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn_bundle(UiCameraBundle::default());
+
+    for _ in 0..FACTOR * 2 {
+        commands
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(0.5, 0.5, 0.5),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(component::Building);
+    }
+
+    commands
+        .spawn_bundle(SpriteBundle {
+            transform: Transform {
+                scale: Vec3::new(SQUARE_SIZE, SQUARE_SIZE, 0.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                color: Color::rgb(1.0, 0.5, 0.5),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(component::Velocity(0.))
+        .insert(component::IsOnFloor(false));
+}
+
+pub fn start_position_setup(
+    mut query_building: Query<&mut Transform, With<component::Building>>,
+    mut query_square: Query<
+        &mut Transform,
+        (With<component::Velocity>, Without<component::Building>),
+    >,
+) {
+    let mut transform_square = query_square.single_mut();
+
+    transform_square.translation.y =
+        HORIZON + HEIGHT_OFFSET_RANGE + BUILDING_BASE_HEIGHT / 2. + SQUARE_SIZE / 2.;
+
+    let mut start = UPPER_LIMIT - GAP;
+
+    for mut transform_building in query_building.iter_mut() {
+        transform_building.translation = Vec3::new(start, HORIZON + HEIGHT_OFFSET_RANGE, 0.);
+        transform_building.scale = Vec3::new(GAP + 1., BUILDING_BASE_HEIGHT, 0.);
+
+        start -= GAP;
+    }
+}
+
+pub fn building_translation(
+    time: Res<Time>,
+    mut query_building: Query<&mut Transform, With<component::Building>>,
+) {
     for mut transform in query_building.iter_mut() {
-        transform.translation.x -= SCROLL_SPEED * TIME_STEP as f32;
+        transform.translation.x -= SCROLL_SPEED * time.delta_seconds();
     }
 }
 
@@ -28,15 +85,18 @@ pub fn reset_building_oob(mut query_building: Query<&mut Transform, With<compone
     }
 }
 
-pub fn gravity(mut query_square: Query<&mut component::Velocity>) {
+pub fn gravity(time: Res<Time>, mut query_square: Query<&mut component::Velocity>) {
     let mut velocity = query_square.single_mut();
 
-    velocity.0 += GRAVITY * TIME_STEP as f32
+    velocity.0 += GRAVITY * time.delta_seconds()
 }
 
-pub fn apply_velocity(mut query_square: Query<(&mut Transform, &component::Velocity)>) {
+pub fn apply_velocity(
+    time: Res<Time>,
+    mut query_square: Query<(&mut Transform, &component::Velocity)>,
+) {
     let (mut transform, velocity) = query_square.single_mut();
-    transform.translation.y += velocity.0 * TIME_STEP as f32
+    transform.translation.y += velocity.0 * time.delta_seconds()
 }
 
 pub fn collision_detection(
@@ -116,14 +176,14 @@ pub fn square_landing(
 
 pub fn loose_condition(
     In(collision_info): In<Option<(Collision, Transform)>>,
-    mut app_exit_event_writer: EventWriter<AppExit>,
+    mut app_state: ResMut<State<AppState>>,
 ) {
     if let Some((Collision::Left, ..)) = collision_info {
-        app_exit_event_writer.send(AppExit)
+        app_state.set(AppState::Paused).unwrap();
     }
 }
 
-pub fn jump_or_fastfall_on_mouse_click(
+pub fn jump_or_fastfall_on_click(
     mouse_button: Res<Input<MouseButton>>,
     mut query_square: Query<(&mut component::Velocity, &mut component::IsOnFloor)>,
 ) {
@@ -136,5 +196,14 @@ pub fn jump_or_fastfall_on_mouse_click(
         } else if velocity.0 > FASTFALL_FORCE {
             velocity.0 = FASTFALL_FORCE
         }
+    }
+}
+
+pub fn resume_on_click(
+    mouse_button: Res<Input<MouseButton>>,
+    mut app_state: ResMut<State<AppState>>,
+) {
+    if mouse_button.just_pressed(MouseButton::Left) {
+        app_state.set(AppState::InGame).unwrap();
     }
 }
