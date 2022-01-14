@@ -185,11 +185,12 @@ pub fn loose_condition(
 
 pub fn jump_or_fastfall_on_click(
     mouse_button: Res<Input<MouseButton>>,
+    keyboard_input: Res<Input<KeyCode>>,
     mut query_square: Query<(&mut component::Velocity, &mut component::IsOnFloor)>,
 ) {
     let (mut velocity, mut is_on_floor) = query_square.single_mut();
 
-    if mouse_button.just_pressed(MouseButton::Left) {
+    if mouse_button.just_pressed(MouseButton::Left) || keyboard_input.just_pressed(KeyCode::Space) {
         if is_on_floor.0 {
             velocity.0 = JUMP_FORCE;
             is_on_floor.0 = false;
@@ -201,9 +202,10 @@ pub fn jump_or_fastfall_on_click(
 
 pub fn resume_on_click(
     mouse_button: Res<Input<MouseButton>>,
+    keyboard_input: Res<Input<KeyCode>>,
     mut app_state: ResMut<State<AppState>>,
 ) {
-    if mouse_button.just_pressed(MouseButton::Left) {
+    if mouse_button.just_pressed(MouseButton::Left) || keyboard_input.just_pressed(KeyCode::Space) {
         app_state.set(AppState::InGame).unwrap();
     }
 }
