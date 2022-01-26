@@ -3,9 +3,21 @@ name = "bevy-building-square-race"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
+default-run = "game"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "game"
+path = "src/main.rs"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
 
 [dependencies]
-bevy = "0.6"
+bevy = { version = "0.6", default-features = false, features = [
+    "bevy_winit",
+    "render",
+    "x11",
+] }
 rand = "0.8"
+bevy_networking_turbulence = "0.4"
